@@ -34,15 +34,29 @@ class TradingSystem:
                 price = price_series.loc[date]
                 prediction = self.tradingFunctions.getPrediction(date, price_series)
                 
+                current_position = self.positions[symbol]
+
                 if prediction == 1 and self.cash >= price:
-                    self.positions[symbol] += 1
+                    # Go long if flat
+                    self.positions[symbol] = 1
                     self.cash -= price
                     self.trade_log.append((date, symbol, 'BUY', price))
-                    
-                elif prediction == -1 and self.positions[symbol] > 0:
-                    self.positions[symbol] -= 1
-                    self.cash += price
-                    self.trade_log.append((date, symbol, 'SELL', price))
+
+                elif prediction == -1 and self.cash >= price:
+                    # Go short if flat (assuming shorting is allowed and symmetric)
+                    self.positions[symbol] = -1
+                    self.cash -= price
+                    self.trade_log.append((date, symbol, 'SHORT', price))
+
+                elif prediction == 0.5 and current_position != 0:
+                    # Exit position
+                    if current_position > 0:
+                        self.cash += price * current_position
+                        self.trade_log.append((date, symbol, 'SELL TO CLOSE', price))
+                    elif current_position < 0:
+                        self.cash += price * abs(current_position)
+                        self.trade_log.append((date, symbol, 'BUY TO COVER', price))
+                    self.positions[symbol] = 0
                 
                 daily_value += self.positions[symbol] * price
                 
